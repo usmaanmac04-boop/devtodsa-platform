@@ -1,70 +1,32 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ProblemCard from '@/components/problems/ProblemCard'
 import { Search } from 'lucide-react'
+import { problemsAPI } from '@/lib/api'
 
 export default function ProblemsPage() {
-  // Dummy data - baad mein backend se aayega
-  const allProblems = [
-    {
-      id: 1,
-      title: "Two Sum",
-      description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-      difficulty: "Easy",
-      tags: ["Array", "Hash Table"],
-      acceptance: 49,
-      solved: false
-    },
-    {
-      id: 2,
-      title: "Add Two Numbers",
-      description: "You are given two non-empty linked lists representing two non-negative integers. Add the two numbers and return the sum as a linked list.",
-      difficulty: "Medium",
-      tags: ["Linked List", "Math"],
-      acceptance: 38,
-      solved: false
-    },
-    {
-      id: 3,
-      title: "Longest Substring Without Repeating Characters",
-      description: "Given a string s, find the length of the longest substring without repeating characters.",
-      difficulty: "Medium",
-      tags: ["String", "Sliding Window"],
-      acceptance: 33,
-      solved: true
-    },
-    {
-      id: 4,
-      title: "Median of Two Sorted Arrays",
-      description: "Given two sorted arrays nums1 and nums2 of size m and n respectively, return the median of the two sorted arrays.",
-      difficulty: "Hard",
-      tags: ["Array", "Binary Search"],
-      acceptance: 35,
-      solved: false
-    },
-    {
-      id: 5,
-      title: "Reverse Integer",
-      description: "Given a signed 32-bit integer x, return x with its digits reversed.",
-      difficulty: "Easy",
-      tags: ["Math"],
-      acceptance: 26,
-      solved: false
-    },
-    {
-      id: 6,
-      title: "Merge Two Sorted Lists",
-      description: "You are given the heads of two sorted linked lists list1 and list2. Merge the two lists into one sorted list.",
-      difficulty: "Easy",
-      tags: ["Linked List", "Recursion"],
-      acceptance: 62,
-      solved: true
-    }
-  ]
-
+  const [allProblems, setAllProblems] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDifficulty, setSelectedDifficulty] = useState('All')
+
+  // Fetch problems from backend
+  useEffect(() => {
+    const fetchProblems = async () => {
+      try {
+        setLoading(true)
+        const response = await problemsAPI.getAll()
+        setAllProblems(response.data)
+      } catch (error) {
+        console.error('Error fetching problems:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProblems()
+  }, [])
 
   // Filter logic
   const filteredProblems = allProblems.filter(problem => {
@@ -73,6 +35,21 @@ export default function ProblemsPage() {
     const matchesDifficulty = selectedDifficulty === 'All' || problem.difficulty === selectedDifficulty
     return matchesSearch && matchesDifficulty
   })
+
+  // Calculate stats
+  const totalSolved = allProblems.filter(p => p.solved).length
+  const totalRemaining = allProblems.length - totalSolved
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading problems...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -126,15 +103,11 @@ export default function ProblemsPage() {
             </div>
             <div>
               <p className="text-sm text-gray-500">Solved</p>
-              <p className="text-2xl font-bold text-green-600">
-                {allProblems.filter(p => p.solved).length}
-              </p>
+              <p className="text-2xl font-bold text-green-600">{totalSolved}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Remaining</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {allProblems.filter(p => !p.solved).length}
-              </p>
+              <p className="text-2xl font-bold text-blue-600">{totalRemaining}</p>
             </div>
           </div>
         </div>
@@ -143,7 +116,7 @@ export default function ProblemsPage() {
         <div className="space-y-4">
           {filteredProblems.length > 0 ? (
             filteredProblems.map((problem) => (
-              <ProblemCard key={problem.id} problem={problem} />
+              <ProblemCard key={problem._id} problem={problem} />
             ))
           ) : (
             <div className="bg-white rounded-lg p-12 text-center">

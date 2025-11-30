@@ -1,46 +1,57 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import CodeEditor from '@/components/editor/CodeEditor'
-import { Play, Send, CheckCircle, XCircle } from 'lucide-react'
+import { Play, Send, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { problemsAPI } from '@/lib/api'
 
-export default function ProblemDetailPage({ params }) {
+export default function ProblemDetailPage() {
+  const params = useParams()
+  const [problem, setProblem] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('javascript')
   const [output, setOutput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
 
-  // Dummy problem data - baad mein backend se aayega
-  const problem = {
-    id: params.id,
-    title: "Two Sum",
-    difficulty: "Easy",
-    description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. You may assume that each input would have exactly one solution, and you may not use the same element twice. You can return the answer in any order.",
-    examples: [
-      {
-        input: "nums = [2,7,11,15], target = 9",
-        output: "[0,1]",
-        explanation: "Because nums[0] + nums[1] == 9, we return [0, 1]."
-      },
-      {
-        input: "nums = [3,2,4], target = 6",
-        output: "[1,2]",
-        explanation: "Because nums[1] + nums[2] == 6, we return [1, 2]."
+  // Fetch problem data
+  useEffect(() => {
+    const fetchProblem = async () => {
+      try {
+        setLoading(true)
+        const response = await problemsAPI.getById(params.id)
+        console.log('Problem Data:', response.data)
+        console.log('Examples:', response.data.examples)
+        setProblem(response.data)
+        // Set starter code
+        if (response.data.starterCode) {
+          setCode(response.data.starterCode[language] || '')
+        }
+      } catch (error) {
+        console.error('Error fetching problem:', error)
+      } finally {
+        setLoading(false)
       }
-    ],
-    constraints: [
-      "2 <= nums.length <= 104",
-      "-109 <= nums[i] <= 109",
-      "-109 <= target <= 109",
-      "Only one valid answer exists."
-    ]
-  }
+    }
+
+    if (params.id) {
+      fetchProblem()
+    }
+  }, [params.id])
+
+  // Update code when language changes
+  useEffect(() => {
+    if (problem?.starterCode) {
+      setCode(problem.starterCode[language] || '')
+    }
+  }, [language, problem])
 
   const handleRunCode = () => {
     setIsRunning(true)
     setOutput('Running code...')
     
-    // Simulate code execution
+    // Simulate code execution (Judge0 integration aayega baad mein)
     setTimeout(() => {
       setOutput('✓ Test case 1 passed\n✓ Test case 2 passed\n✓ All test cases passed!')
       setIsRunning(false)
@@ -61,6 +72,28 @@ export default function ProblemDetailPage({ params }) {
     Easy: 'text-green-600 bg-green-100',
     Medium: 'text-yellow-600 bg-yellow-100',
     Hard: 'text-red-600 bg-red-100'
+  }
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="animate-spin h-16 w-16 text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg">Loading problem...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!problem) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <XCircle className="h-16 w-16 text-red-600 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg">Problem not found</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -86,30 +119,43 @@ export default function ProblemDetailPage({ params }) {
               <p className="text-gray-700 leading-relaxed">{problem.description}</p>
             </div>
 
-            {/* Examples */}
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-3">Examples</h2>
-              {problem.examples.map((example, index) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
-                  <p className="font-semibold text-gray-900 mb-2">Example {index + 1}:</p>
-                  <div className="space-y-2 text-sm">
-                    <p><span className="font-semibold">Input:</span> <code className="bg-gray-200 px-2 py-1 rounded">{example.input}</code></p>
-                    <p><span className="font-semibold">Output:</span> <code className="bg-gray-200 px-2 py-1 rounded">{example.output}</code></p>
-                    <p><span className="font-semibold">Explanation:</span> {example.explanation}</p>
+            {/* Examples - WITH VISIBLE TEXT */}
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-3">Examples</h2>
+                {problem.examples && problem.examples.map((example, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
+                    <p className="font-semibold text-gray-900 mb-2">Example {index + 1}:</p>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <p>
+                        <span className="font-semibold text-gray-900">Input:</span>{' '}
+                        <code className="bg-gray-200 text-gray-900 px-2 py-1 rounded">{example.input}</code>
+                      </p>
+                      <p>
+                        <span className="font-semibold text-gray-900">Output:</span>{' '}
+                        <code className="bg-gray-200 text-gray-900 px-2 py-1 rounded">{example.output}</code>
+                      </p>
+                      {example.explanation && (
+                        <p>
+                          <span className="font-semibold text-gray-900">Explanation:</span> {example.explanation}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            
 
             {/* Constraints */}
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-3">Constraints</h2>
-              <ul className="list-disc list-inside space-y-2 text-gray-700">
-                {problem.constraints.map((constraint, index) => (
-                  <li key={index}>{constraint}</li>
-                ))}
-              </ul>
-            </div>
+            {problem.constraints && problem.constraints.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-3">Constraints</h2>
+                <ul className="list-disc list-inside space-y-2 text-gray-700">
+                  {problem.constraints.map((constraint, index) => (
+                    <li key={index}>{constraint}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
@@ -135,7 +181,7 @@ export default function ProblemDetailPage({ params }) {
                 disabled={isRunning}
                 className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-5 py-2 rounded-lg font-medium transition disabled:opacity-50"
               >
-                <Play size={18} />
+                {isRunning ? <Loader2 className="animate-spin" size={18} /> : <Play size={18} />}
                 Run
               </button>
               <button

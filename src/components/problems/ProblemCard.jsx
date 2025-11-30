@@ -9,7 +9,7 @@ export default function ProblemCard({ problem }) {
   }
 
   return (
-    <Link href={`/problems/${problem.id}`}>
+    <Link href={`/problems/${problem._id}`}>
       <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition hover:border-blue-400 cursor-pointer">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -44,7 +44,11 @@ export default function ProblemCard({ problem }) {
 
           <div className="text-right ml-4">
             <p className="text-sm text-gray-500">Acceptance</p>
-            <p className="text-lg font-bold text-gray-900">{problem.acceptance}%</p>
+            <p className="text-lg font-bold text-gray-900">
+              {problem.submissions > 0 
+                ? Math.round((problem.acceptance / problem.submissions) * 100) 
+                : 0}%
+            </p>
           </div>
         </div>
       </div>
