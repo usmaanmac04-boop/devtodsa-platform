@@ -42,8 +42,15 @@ export const problemsAPI = {
   }
 };
 
-// Submissions API (we'll add this later)
+// Submissions API
 export const submissionsAPI = {
+  // Run code without saving
+  run: async (data) => {
+    const response = await api.post('/submissions/run', data);
+    return response.data;
+  },
+
+  // Submit code and save
   submit: async (submissionData) => {
     const response = await api.post('/submissions', submissionData);
     return response.data;

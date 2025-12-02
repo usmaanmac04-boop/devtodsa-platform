@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import CodeEditor from '@/components/editor/CodeEditor'
 import { Play, Send, CheckCircle, XCircle, Loader2 } from 'lucide-react'
-import { problemsAPI } from '@/lib/api'
+import { problemsAPI, submissionsAPI } from '@/lib/api'
 
 export default function ProblemDetailPage() {
   const params = useParams()
@@ -21,8 +21,6 @@ export default function ProblemDetailPage() {
       try {
         setLoading(true)
         const response = await problemsAPI.getById(params.id)
-        console.log('Problem Data:', response.data)
-        console.log('Examples:', response.data.examples)
         setProblem(response.data)
         // Set starter code
         if (response.data.starterCode) {
@@ -47,25 +45,79 @@ export default function ProblemDetailPage() {
     }
   }, [language, problem])
 
-  const handleRunCode = () => {
+  const handleRunCode = async () => {
+    if (!code.trim()) {
+      setOutput('❌ Please write some code first!')
+      return
+    }
+
     setIsRunning(true)
-    setOutput('Running code...')
+    setOutput('⏳ Running code...')
     
-    // Simulate code execution (Judge0 integration aayega baad mein)
-    setTimeout(() => {
-      setOutput('✓ Test case 1 passed\n✓ Test case 2 passed\n✓ All test cases passed!')
+    try {
+      const response = await submissionsAPI.run({
+        code: code,
+        language: language,
+        input: '' // Can add custom input later
+      })
+
+      if (response.success) {
+        setOutput(`✅ Code executed successfully!\n\nOutput:\n${response.output}\n\nTime: ${response.time}s | Memory: ${response.memory}KB`)
+      } else {
+        setOutput(`❌ Error:\n${response.error || response.message}`)
+      }
+    } catch (error) {
+      setOutput(`❌ Error running code:\n${error.response?.data?.message || error.message}`)
+    } finally {
       setIsRunning(false)
-    }, 1500)
+    }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!code.trim()) {
+      setOutput('❌ Please write some code first!')
+      return
+    }
+
     setIsRunning(true)
-    setOutput('Submitting solution...')
+    setOutput('⏳ Submitting solution...')
     
-    setTimeout(() => {
-      setOutput('✓ Accepted\nRuntime: 68ms\nMemory: 42.1MB\nBeats 85% of submissions!')
+    try {
+      const response = await submissionsAPI.submit({
+        problemId: params.id,
+        code: code,
+        language: language
+      })
+
+      if (response.success) {
+        const { status, passedCount, totalTests, message, testResults } = response
+        
+        let outputText = `${status === 'Accepted' ? '🎉' : '❌'} ${message}\n\n`
+        outputText += `Passed: ${passedCount}/${totalTests} test cases\n\n`
+        
+        // Show test results
+        testResults.forEach((test, index) => {
+          outputText += `Test ${index + 1}: ${test.passed ? '✅ Passed' : '❌ Failed'}\n`
+          if (!test.isHidden && !test.passed) {
+            outputText += `  Expected: ${test.expectedOutput}\n`
+            outputText += `  Got: ${test.actualOutput}\n`
+          }
+          outputText += '\n'
+        })
+
+        if (status === 'Accepted') {
+          outputText += '\n🎉 Congratulations! Your solution is correct!'
+        }
+
+        setOutput(outputText)
+      } else {
+        setOutput(`❌ Submission failed:\n${response.message}`)
+      }
+    } catch (error) {
+      setOutput(`❌ Error submitting code:\n${error.response?.data?.message || error.message}`)
+    } finally {
       setIsRunning(false)
-    }, 2000)
+    }
   }
 
   const difficultyColors = {
@@ -119,20 +171,21 @@ export default function ProblemDetailPage() {
               <p className="text-gray-700 leading-relaxed">{problem.description}</p>
             </div>
 
-            {/* Examples - WITH VISIBLE TEXT */}
+            {/* Examples */}
+            {problem.examples && Array.isArray(problem.examples) && problem.examples.length > 0 && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-3">Examples</h2>
-                {problem.examples && problem.examples.map((example, index) => (
+                {problem.examples.map((example, index) => (
                   <div key={index} className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
                     <p className="font-semibold text-gray-900 mb-2">Example {index + 1}:</p>
                     <div className="space-y-2 text-sm text-gray-700">
                       <p>
                         <span className="font-semibold text-gray-900">Input:</span>{' '}
-                        <code className="bg-gray-200 text-gray-900 px-2 py-1 rounded">{example.input}</code>
+                        <code className="bg-gray-200 text-gray-900 px-2 py-1 rounded">{example.input || 'N/A'}</code>
                       </p>
                       <p>
                         <span className="font-semibold text-gray-900">Output:</span>{' '}
-                        <code className="bg-gray-200 text-gray-900 px-2 py-1 rounded">{example.output}</code>
+                        <code className="bg-gray-200 text-gray-900 px-2 py-1 rounded">{example.output || 'N/A'}</code>
                       </p>
                       {example.explanation && (
                         <p>
@@ -143,7 +196,7 @@ export default function ProblemDetailPage() {
                   </div>
                 ))}
               </div>
-            
+            )}
 
             {/* Constraints */}
             {problem.constraints && problem.constraints.length > 0 && (
@@ -204,15 +257,17 @@ export default function ProblemDetailPage() {
             />
           </div>
 
-          {/* Output Panel */}
-          {output && (
-            <div className="h-48 bg-gray-800 border-t border-gray-700 p-4 overflow-y-auto">
-              <h3 className="text-white font-semibold mb-2">Output:</h3>
+          {/* Output Panel - ALWAYS VISIBLE */}
+          <div className="h-48 bg-gray-800 border-t border-gray-700 p-4 overflow-y-auto">
+            <h3 className="text-white font-semibold mb-2">Output:</h3>
+            {output ? (
               <pre className="text-green-400 text-sm whitespace-pre-wrap font-mono">
                 {output}
               </pre>
-            </div>
-          )}
+            ) : (
+              <p className="text-gray-400 text-sm italic">Click "Run" or "Submit" to see output...</p>
+            )}
+          </div>
         </div>
       </div>
     </div>
